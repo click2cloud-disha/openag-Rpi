@@ -1,5 +1,5 @@
 # Create Raspberry Pi 3 Image
-1. Follow the steps to [Install Raspberry Pi 3 from Source](install_raspberry_pi_3_source) with your preferred runtime option
+1. Follow the steps to [Install Raspberry Pi 3 from Source](install_raspberry_pi_3_source.md) with your preferred runtime option
 2. Make sure you can see the raspberry pi wifi access point from your laptop `RaspberryPi-XXXX`
 3. Run image prep script
 ```
