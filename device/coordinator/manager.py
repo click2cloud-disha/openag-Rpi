@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any, Tuple
 # Import app models
 from app import models
 
+from device.iot.manager import IotManager
 # Import device utilities
 from device.utilities.statemachine.manager import StateMachineManager
 from device.utilities.state.main import State
@@ -25,6 +26,10 @@ from device.upgrade.manager import UpgradeManager
 from device.coordinator import modes, events
 
 from django.conf import settings
+
+from device.peripherals.modules.custom_sensors.manager import CustomSensorManager
+
+import threading
 
 # Initialize file paths
 RECIPES_PATH = "data/recipes/*.json"
@@ -74,6 +79,8 @@ class CoordinatorManager(StateMachineManager):
         # Initialize state
         self.state = State()
 
+        self.custom_sensor = CustomSensorManager(self.state)
+
         # Initialize environment state dict, TODO: remove this
         self.state.environment = {
             "sensor": {"desired": {}, "reported": {}},
@@ -95,7 +102,9 @@ class CoordinatorManager(StateMachineManager):
         self.recipe = RecipeManager(self.state)
         self.iot = IotManager(self.state, self.recipe)  # type: ignore
         self.recipe.set_iot(self.iot)
-        self.resource = ResourceManager(self.state, self.iot)  # type: ignore
+        # if self.iot:
+        #       self.recipe.set_iot(self.iot)
+        self.resource = ResourceManager(self.state, None)  # type: ignore
         self.network = NetworkManager(self.state)  # type: ignore
         self.upgrade = UpgradeManager(self.state)  # type: ignore
 
@@ -163,7 +172,7 @@ class CoordinatorManager(StateMachineManager):
             "Coordinator": self.mode,
             "Recipe": self.recipe.mode,
             "Network": self.network.mode,
-            "IoT": self.iot.mode,
+            "IoT": self.iot.mode if self.iot else "DISABLED",
             "Resource": self.resource.mode,
         }
 
@@ -198,6 +207,7 @@ class CoordinatorManager(StateMachineManager):
     ##### STATE MACHINE FUNCTIONS ######################################################
 
     def run(self) -> None:
+        print("🔥 RUN METHOD ENTERED")
         """Runs device state machine."""
 
         # Loop forever
@@ -231,73 +241,75 @@ class CoordinatorManager(StateMachineManager):
                 break
 
     def run_init_mode(self) -> None:
+        print("🔥 INIT MODE ENTERED")
         """Runs init mode. Loads local data files and stored database state 
         then transitions to config mode."""
         self.logger.info("Entered INIT")
 
         # Load local data files and stored db state
-        self.load_local_data_files()
-        self.load_database_stored_state()
+        # self.load_local_data_files()
+        # self.load_database_stored_state()
 
         # Transition to config mode on next state machine update
+        print("🔥 INIT SUCCESS → MOVING TO CONFIG")
         self.mode = modes.CONFIG
 
     def run_config_mode(self) -> None:
-        """Runs configuration mode. If device config is not set, loads 'unspecified' 
-        config then transitions to setup mode."""
+        """Runs configuration mode."""
+        print("🔥 CONFIG MODE ENTERED")
         self.logger.info("Entered CONFIG")
 
-        # Check device config specifier file exists in repo
         try:
             with open(DEVICE_CONFIG_PATH) as f:
                 config_name = f.readline().strip()
-        except:
 
-            env_dev_type = os.getenv("OPEN_AG_DEVICE_TYPE")
-            if env_dev_type is None:
-                config_name = "unspecified"
-                message = "Unable to read {}, using unspecified config".format(
-                    DEVICE_CONFIG_PATH
-                )
-            else:
-                config_name = env_dev_type
-                message = "Unable to read {}, using {} config from env".format(
-                    DEVICE_CONFIG_PATH, config_name
-                )
+        except Exception:
+            config_name = "unspecified"
+            self.logger.warning("Using fallback config: unspecified")
 
-            self.logger.warning(message)
-
-            # Create the directories if needed
             os.makedirs(os.path.dirname(DEVICE_CONFIG_PATH), exist_ok=True)
-
-            # Write `unspecified` to device.txt
             with open(DEVICE_CONFIG_PATH, "w") as f:
                 f.write("{}\n".format(config_name))
 
         # Load device config
-        self.logger.debug("Loading device config file: {}".format(config_name))
-        device_config = json.load(open("data/devices/{}.json".format(config_name)))
+        print("🔥 LOADING CONFIG:", config_name)
 
-        # Check if config uuid changed, if so, adjust state
+        try:
+            device_config = json.load(open(f"data/devices/{config_name}.json"))
+            print("🔥 CONFIG LOADED SUCCESSFULLY")
+
+        except Exception as e:
+            print("❌ CONFIG LOAD ERROR:", e)
+            self.mode = modes.ERROR
+            return
+
+        # Reset state if config changed
         if self.config_uuid != device_config["uuid"]:
             with self.state.lock:
                 self.state.peripherals = {}
                 self.state.controllers = {}
+
                 set_nested_dict_safely(
                     self.state.environment,
                     ["reported_sensor_stats"],
                     {},
                     self.state.lock,
                 )
+
                 set_nested_dict_safely(
-                    self.state.environment, ["sensor", "reported"], {}, self.state.lock
+                    self.state.environment,
+                    ["sensor", "reported"],
+                    {},
+                    self.state.lock,
                 )
+
                 self.config_uuid = device_config["uuid"]
 
-        # Transition to setup mode on next state machine update
+        # ✅ Move forward
         self.mode = modes.SETUP
 
     def run_setup_mode(self) -> None:
+        print("🔥 SETUP MODE ENTERED")
         """Runs setup mode. Creates and spawns recipe, peripheral, and 
         controller threads, waits for all threads to initialize then 
         transitions to normal mode."""
@@ -307,10 +319,15 @@ class CoordinatorManager(StateMachineManager):
         # Spawn managers
         if not self.new_config:
             self.recipe.spawn()
-            self.iot.spawn()
+            if self.iot:
+                self.iot.spawn()
             self.resource.spawn()
             self.network.spawn()
             self.upgrade.spawn()
+
+
+            threading.Thread(target=self.custom_sensor.run, daemon=True).start()
+            print("?? Custom Sensor Thread Started")
 
         # Create and spawn peripherals
         self.logger.debug("Creating and spawning peripherals")
@@ -398,7 +415,8 @@ class CoordinatorManager(StateMachineManager):
         self.shutdown_peripheral_threads()
         self.shutdown_controller_threads()
         self.recipe.shutdown()
-        self.iot.shutdown()
+        if self.iot:
+            self.iot.shutdown()
 
         # Transition to init mode on next state machine update
         self.mode = modes.INIT
@@ -762,7 +780,7 @@ class CoordinatorManager(StateMachineManager):
 
             # Get peripheral module and class name
             module_name = (
-                "device.peripherals.modules." + peripheral_setup_dict["module_name"]
+                    "device.peripherals.modules." + peripheral_setup_dict["module_name"]
             )
             class_name = peripheral_setup_dict["class_name"]
 
@@ -840,7 +858,7 @@ class CoordinatorManager(StateMachineManager):
 
             # Get controller module and class name
             module_name = (
-                "device.controllers.modules." + controller_setup_dict["module_name"]
+                    "device.controllers.modules." + controller_setup_dict["module_name"]
             )
             class_name = controller_setup_dict["class_name"]
 
@@ -878,6 +896,7 @@ class CoordinatorManager(StateMachineManager):
     def all_peripherals_initialized(self) -> bool:
         """Checks if all peripherals have initialized."""
         for name, manager in self.peripherals.items():
+            print(f"🔍 Peripheral {name} mode: {manager.mode}")
             if manager.mode == modes.INIT:
                 return False
         return True

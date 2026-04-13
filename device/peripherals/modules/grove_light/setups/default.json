@@ -1,0 +1,19 @@
+{
+  "name": "grove_light_sensor",
+  "version": "1.0",
+  "uuid": "09dbfe7c-2397-44ac-a5c5-09596bcbf1de",
+  "module_name": "grove_light",
+  "class_name": "Manager",
+  "info": {
+    "description": "Grove light sensor"
+  },
+  "parameters": {
+    "communication": null,
+    "variables": {
+      "sensor": {
+        "channel": 0
+      },
+      "actuator": null
+    }
+  }
+}

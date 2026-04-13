@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # IMAGE_UPLOAD_URL = 'https://us-central1-fb-func-test.cloudfunctions.net/saveImage'
 # IMAGE_UPLOAD_URL = 'http://localhost:5000/fb-func-test/us-central1/saveImage'
 # Self hosted backend below
-IMAGE_UPLOAD_URL = 'http://192.168.1.52/saveImage'
+IMAGE_UPLOAD_URL = 'http://192.168.9.32/saveImage'
 
 # URL that we use to check if we're connected to the network
 NETWORK_UP_CHECK_URL = 'http://www.google.com/'  # Should change this to something we control
@@ -330,3 +330,5 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+# ✅ DEVICE CONFIG (ADD THIS)
+DEVICE_CONFIG = os.path.join(DATA_PATH, "device_config.json")

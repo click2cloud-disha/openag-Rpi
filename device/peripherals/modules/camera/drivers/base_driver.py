@@ -55,9 +55,13 @@ class CameraDriver(ABC):
         # Check if simulating
         if self.simulate:
             self.logger.info("Simulating driver")
-            # image uploads needs images in the usual spot, just like a real one.
             #self.directory = self.SIMULATE_IMAGE_DIR
             self.directory = self.IMAGE_DIR
+
+            self.capture_dir = self.CAPTURE_DIR
+            if not os.path.exists(self.capture_dir):
+                os.makedirs(self.capture_dir)
+
             self.usb_mux_enabled = False
         else:
             self.directory = self.IMAGE_DIR
@@ -71,9 +75,15 @@ class CameraDriver(ABC):
                 os.makedirs(self.capture_dir)
 
             # Check if using usb mux
-            if usb_mux_comms is None \
-                    or usb_mux_channel is None:
+            if usb_mux_comms is None or usb_mux_channel is None:
                 self.usb_mux_enabled = False
+
+    # ✅ ensure directories still initialize
+                self.capture_dir = self.CAPTURE_DIR
+
+                if not os.path.exists(self.capture_dir):
+                    os.makedirs(self.capture_dir)
+
                 return
 
             # Initialize usb mux properties

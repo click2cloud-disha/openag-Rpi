@@ -1,0 +1,19 @@
+{
+  "name": "grove_moisture_sensor",
+  "version": "1.0",
+  "uuid": "6d6476b2-16af-4a0d-9856-72b18cb04f41",
+  "module_name": "grove_moisture",
+  "class_name": "Manager",
+  "info": {
+    "description": "Grove soil moisture sensor"
+  },
+  "parameters": {
+    "communication": null,
+    "variables": {
+      "sensor": {
+        "channel": 2
+      },
+      "actuator": null
+    }
+  }
+}

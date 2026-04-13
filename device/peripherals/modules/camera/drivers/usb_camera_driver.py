@@ -256,7 +256,7 @@ class USBCameraDriver(CameraDriver):
 
             # Look for camera
             try:
-                camera_paths = usb.get_camera_paths(self.vendor_id, self.product_id)
+                camera_paths = ["/dev/video0"]
 
                 # Check if camera powered down
                 if len(camera_paths) == self.num_cameras:

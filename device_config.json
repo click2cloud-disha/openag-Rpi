@@ -1,0 +1,19 @@
+{
+  "actuators": {
+    "fan": {
+      "pin": 16,
+      "type": "relay"
+    },
+    "pump": {
+      "pin": 5,
+      "type": "relay"
+    },
+    "cooling_fan": {
+      "pin": 6,
+      "type": "relay"
+    },
+    "camera": {
+      "type": "camera"
+    }
+  }
+}
